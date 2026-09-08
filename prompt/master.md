@@ -1,4 +1,4 @@
 # Read following files in exact order and proceed accordingly:
 
-https://codeberg.org/alksbrs/ipu6_llm/blob/main/prompt/instructions.md
-https://codeberg.org/alksbrs/ipu6_llm/blob/main/transcripts/transcript.md
+https://raw.githubusercontent.com/alksbrs/ipu6/refs/heads/main/prompt/instructions.md
+https://raw.githubusercontent.com/alksbrs/ipu6/refs/heads/main/transcript/transcript.md
