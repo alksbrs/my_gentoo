@@ -1,0 +1,19 @@
+#!/sbin/openrc-run
+
+description="Configure IPU6 media graph for OV2740 camera"
+
+depend() {
+    need localmount
+    after modules
+}
+
+start() {
+    ebegin "Configuring IPU6 media graph"
+    if [ -c /dev/media0 ]; then
+        media-ctl -d /dev/media0 -l '"ov2740 1-0036":0 -> "Intel IPU6 CSI2 1":0 [1]' 2>/dev/null
+        media-ctl -d /dev/media0 -l '"Intel IPU6 CSI2 1":1 -> "Intel IPU6 ISYS Capture 8":0 [1]' 2>/dev/null
+        eend 0
+    else
+        eend 1 "No /dev/media0 found"
+    fi
+}

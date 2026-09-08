@@ -1,0 +1,27 @@
+From: Lumo Assistant <proton.me>
+Date: 30 Aug 2026
+Subject: [PATCH] media: ipu6-isys: Increase line alignment from 64 to 256 bytes
+
+The xe kernel driver (iGPU and dGPU) requires 4096-byte stride alignment
+for DMA-BUF texture imports via eglCreateImageKHR. The IPU6 ISYS driver
+allocates buffers with line_align=64, producing 3904-byte stride
+(ALIGN 3864 to 64 = 3904). Changing to line_align=256 produces 4096-byte
+stride (ALIGN 3864 to 256 = 4096), enabling zero-copy DMA-BUF import.
+
+This fixes eglCreateImageKHR failures when using GPU-accelerated SoftISP
+with Intel Arc dGPU or Iris Xe iGPU on Alder Lake-P systems.
+
+
+Signed-off-by: Aleksei <alksbrs@proton.me>
+
+--- a/drivers/media/pci/intel/ipu6/ipu6-isys-video.c
++++ b/drivers/media/pci/intel/ipu6/ipu6-isys-video.c
+@@ -241,7 +241,7 @@
+ 	else
+ 		*bytesperline = DIV_ROUND_UP(*width * pfmt->bpp, BITS_PER_BYTE);
+ 
+-	*bytesperline = ALIGN(*bytesperline, 64);
++	*bytesperline = ALIGN(*bytesperline, 256);
+ 
+ 	/*
+ 	 * (height + 1) * bytesperline due to a hardware issue: the DMA unit

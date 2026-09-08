@@ -1,0 +1,32 @@
+# /usr/share/libcamera/ipa/simple/ov2740.yaml
+# SPDX-License-Identifier: CC0-1.0
+# Calibrated from OV2740_CJFLE23_ADL.aiqb (Lenovo JP2 module, IPU6 ADL)
+%YAML 1.1
+---
+version: 1
+algorithms:
+  - BlackLevel:
+      blackLevel: 4096
+  - Awb:
+      algorithm: grey
+      maxGainR: 2.49
+      maxGainB: 3.07
+      speed: 0.25
+      # colourGains block intentionally omitted here — upstream v3 adds
+      # an AwbGrey colourGains entry that is a documented no-op until
+      # series 5874 (CCT-indexed AWB) merges. Adding it now buys nothing
+      # and adds a maintenance trap if you forget why it's there.
+  - Ccm:
+      ccms:
+        - { ct: 2319, ccm: [ 1.5938, -0.1714, -0.4224, -0.6134,  1.9612, -0.3478, -0.4710, -1.8500,  3.3210 ] }
+        - { ct: 2854, ccm: [ 1.6119, -0.3132, -0.2987, -0.4418,  1.8227, -0.3809, -0.1017, -1.3958,  2.4975 ] }
+        - { ct: 3239, ccm: [ 1.6494, -0.3819, -0.0245, -0.7782,  1.8026, -0.4347, -0.0245, -0.7782,  1.8026 ] }
+        - { ct: 3865, ccm: [ 1.6401, -0.4418, -0.1984, -0.2360,  1.7191, -0.4832, -0.0248, -0.7221,  1.7469 ] }
+        - { ct: 4939, ccm: [ 1.5552, -0.4300, -0.1252, -0.2682,  1.7482, -0.4799, -0.0305, -0.5758,  1.6063 ] }
+        - { ct: 6302, ccm: [ 1.6401, -0.4418, -0.1984, -0.2360,  1.7191, -0.4832, -0.0248, -0.7221,  1.7469 ] }
+  - Adjust:
+      gamma: 2.2
+      contrast: 1.0
+      saturation: 1.0
+  - Agc:
+      maxGain: 8.0    # (range 1x-15.5x) raise if scenes are dark, 8.0 is in the middle
