@@ -75,6 +75,100 @@ grep -i -E "debayer_egl|eglCreateImageKHR" /tmp/wp-gpu-check.log
 *camera frames flow test*
 gst-launch-1.0 pipewiresrc target-object="libcamera_input.__SB_.PC00.LNK0" ! videoconvert ! autovideosink
 
+## gstreamer test captures (synthetic video source)
+
+# AV1 primary
+gst-launch-1.0 videotestsrc num-buffers=90 ! video/x-raw,width=1280,height=720 ! \
+  varenderD129postproc ! video/x-raw\(memory:VAMemory\),format=NV12 ! \
+  varenderD129av1lpenc rate-control=cbr bitrate=2000 ! av1parse ! matroskamux ! \
+  filesink location=/tmp/va-av1-test.mkv
+
+# VP9 fallback
+gst-launch-1.0 videotestsrc num-buffers=90 ! video/x-raw,width=1280,height=720 ! \
+  varenderD129postproc ! video/x-raw\(memory:VAMemory\),format=NV12 ! \
+  varenderD129vp9lpenc rate-control=cbr bitrate=2000 ! matroskamux ! \
+  filesink location=/tmp/va-vp9-test.mkv
+
+## gstreamer test captures (webcam's native 1932x1092px)
+
+# AV1, near-native resolution, live camera source
+gst-launch-1.0 pipewiresrc target-object="libcamera_input.__SB_.PC00.LNK0" ! \
+  video/x-raw,width=1920,height=1080 ! videoconvert ! \
+  varenderD129postproc ! video/x-raw\(memory:VAMemory\),format=NV12 ! \
+  varenderD129av1lpenc rate-control=cbr bitrate=4000 ! av1parse ! matroskamux ! \
+  filesink location=/tmp/va-av1-native.mkv
+
+# VP9, near-native resolution, live camera source
+gst-launch-1.0 pipewiresrc target-object="libcamera_input.__SB_.PC00.LNK0" ! \
+  video/x-raw,width=1920,height=1080 ! videoconvert ! \
+  varenderD129postproc ! video/x-raw\(memory:VAMemory\),format=NV12 ! \
+  varenderD129vp9lpenc rate-control=cbr bitrate=4000 ! matroskamux ! \
+  filesink location=/tmp/va-vp9-native.mkv
+
+## test capture to the screen
+
+gst-launch-1.0 pipewiresrc target-object="libcamera_input.__SB_.PC00.LNK0" ! \
+  video/x-raw,width=1920,height=1080 ! videoconvert ! \
+  varenderD129postproc ! video/x-raw\(memory:VAMemory\),format=NV12 ! \
+  varenderD129postproc ! video/x-raw ! videoconvert ! autovideosink
+
+## playback of test captures
+
+gst-launch-1.0 filesrc location=/tmp/va-vp9-native.mkv ! matroskademux ! \
+  vp9parse ! varenderD129vp9dec ! videoconvert ! autovideosink
+
+gst-launch-1.0 filesrc location=/tmp/va-av1-native.mkv ! matroskademux ! \
+  av1parse ! varenderD129av1dec ! videoconvert ! autovideosink
+
+## gstreamer live video capture test
+
+* shell 1
+
+
+
+* shell 2
+
+
+
+*TO-DO*
+
+OPTION 1
+
+Use Epiphany for WebRTC but mitigate the memory-residency issue:
+
+# Force VA surfaces to stay on GPU by ranking VA-API decoders highest
+export GST_PLUGIN_FEATURE_RANK="vaapih264enc:MARGINAL,vaapih264dec:PRIMARY"
+
+# Set memory limit to prevent implicit swaps
+export GST_ALLOCATOR_VSP2_FORCE_CONTIGUOUS=1
+export VA_DRIVER_NAME=iHD  # Intel only; AMD use radeonsi
+
+
+# Force VA surfaces to stay on GPU by ranking VA-API decoders highest
+export GST_PLUGIN_FEATURE_RANK="vaapih264enc:MARGINAL,vaapih264dec:PRIMARY"
+
+# Set memory limit to prevent implicit swaps
+export GST_ALLOCATOR_VSP2_FORCE_CONTIGUOUS=1
+export VA_DRIVER_NAME=iHD  # Intel only; AMD use radeonsi
+Reality check: This is band-aid territory. The GStreamer pipeline still lacks architectural commitment to GPU residency. You'll achieve ~70-80% success compared to FFmpeg's near-100%.
+
+
+OPTION 2
+
+libva directly	✅ Excellent — Full control, true zero-copy with DMA-BUF export	⚠️ Manual Wayland integration, must use DRM/EGL	High	Intel/AMD/NVIDIA	Optimal for custom pipelines; steepest learning curve
+
+OPTION 3
+
+Investigate V4L2 M2M if your dGPU supports it (check vainfo for V4L2 codec exposure)
+On Raspberry Pi and some embedded Intel platforms, V4L2-M2M is native zero-copy
+Unlikely on your discrete x86 dGPU, but worth verifying
+
+OPTION 4
+
+If Epiphany is mandatory (e.g., tight GNOME integration), use it for video playback only, and route WebRTC conferencing through a separate standalone CLI app (using FFmpeg directly) with Epiphany displaying the output via HTTP streams or local sockets.
+
+
+
 
 ----------------------
 

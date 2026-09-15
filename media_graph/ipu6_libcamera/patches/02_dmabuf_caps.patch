@@ -1,0 +1,36 @@
+--- a/src/gstreamer/gstlibcamera-utils.cpp
++++ b/src/gstreamer/gstlibcamera-utils.cpp
+@@ -308,6 +308,33 @@ static PixelFormat
+ 	return PixelFormat{};
+ }
+ 
++/*
++ * Build a DMA-BUF-tagged caps structure for a format.
++ * GstLibcameraAllocator buffers are plain, linear DMA-BUFs sourced from
++ * libcamera's FrameBufferAllocator. DRM_FORMAT_MOD_LINEAR is always correct.
++ */
++static GstStructure *
++dmabuf_structure_from_format(const PixelFormat &format)
++{
++	GstVideoFormat gst_format = pixel_format_to_gst_format(format);
++
++	if (gst_format == GST_VIDEO_FORMAT_UNKNOWN ||
++	    gst_format == GST_VIDEO_FORMAT_ENCODED)
++		return nullptr;
++
++	/* Convert pixel format to a fourcc string GStreamer understands */
++	const gchar *format_str = gst_video_format_to_string(gst_format);
++	if (!format_str)
++		return nullptr;
++
++	return gst_structure_new("video/x-raw",
++				 "format", G_TYPE_STRING, format_str,
++				 "memory", G_TYPE_STRING, "memory:DMABuf",
++				 "width", G_TYPE_INT, 1,
++				 "height", G_TYPE_INT, 1,
++				 nullptr);
++}
++
+ static GstStructure *
+ bare_structure_from_format(const PixelFormat &format)
+ {

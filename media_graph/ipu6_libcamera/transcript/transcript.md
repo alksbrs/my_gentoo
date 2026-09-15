@@ -28,12 +28,6 @@ dma-heap EXONERATED: system heap operative (allocation+mmap roundtrip OK full fr
 Binary provenance exonerated as cause: controlled rebuild (patched tree, verify-then-build) reproduced black → fault is in code path, not binary history
 CPU/GPU A/B (explicit SOFTISP_MODE): CPU mean ~21/49%-ish, GPU bit-exact zero (pre-fix) — GPU-path isolation confirmed
 Post-fix validation: probe 0,0,0,255 → 16,16,16 / 0,12,3 / 8,11,0... ; full-frame 49.22% nonzero, max 255, mean 10.51; zero eglCreateImageKHR failures; ~30 fps cadence; IRIS Xe (ADL GT2)
-Overlay self-sufficiency PROVEN: ebuild clean prepare from nothing → 4/4 patches [ok] (fuzz 2 on egl-r16-import hunk 2 — benign, known)
-Daylight scale CLOSED: stabilized frames (post-AGC-ramp) mean 111.36-112.36, nonzero 98.59-98.64% — inside predicted 80-170 daylight range; shader fix holds under both night+flashlight and cloudy daylight
-Color (green-cast) root cause CLOSED: local `ov2740.yaml` CCM table had two corrupted entries vs upstream — ct:3239 held a mis-copied fragment of upstream's ct:4939 matrix; ct:3865 was a verbatim duplicate of ct:6302. ct:2884 and ct:4136 anchors (present upstream) were missing entirely. Fixed by restoring all four entries from upstream v3/v4 (patchwork.libcamera.org series 5948). ct:2319/2854/4939/6302 were already correct — not touched
-Color fix VERIFIED via per-channel PPM analysis (R/G/B means, not just luminance) across two independent lighting conditions: bright cloudy daylight G/R 1.217→1.038, G/B 1.186→1.038; dim/later-hour daylight G/R settled 1.031-1.054, G/B 1.026-1.052 — both post-fix results inside ±0.05-of-neutral band
-KNOWN LIMITATION, accepted (not fixed, per user call): true-neutral reference test (white paper, dim conditions) showed residual G/R 1.17-1.20 (G/B near-neutral 1.04-1.05). AWB log showed scene temperature estimated at 9540-9556K — ~3200K past the highest calibrated CCM anchor (6302K). No AIQB calibration data exists above 6302K (upstream or local); `Ccm::prepare()` (src/ipa/simple/algorithms/ccm.cpp) interpolates unconditionally from AWB's estimated temperatureK with no confirmed in-tree clamp behavior verified. Residual attributed to CT-estimate exceeding calibrated coverage, not to a defect in the restored CCM data. User closed image quality on this basis — see §7
-
 ## 4. Commands used
 
 Capture (canonical form): `DRI_PRIME=... LIBCAMERA_SOFTISP_MODE=gpu LIBCAMERA_LOG_LEVELS="*:DEBUG" timeout 10 cam -c 1 -C6 -F'/tmp/x#.ppm' -s role=viewfinder,width=1932,height=1092 2>&1 | tee /tmp/x.log`

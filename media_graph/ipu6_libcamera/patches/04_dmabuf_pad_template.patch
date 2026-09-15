@@ -1,0 +1,11 @@
+--- a/src/gstreamer/gstlibcamerasrc.cpp
++++ b/src/gstreamer/gstlibcamerasrc.cpp
+@@ -35,7 +35,7 @@ using namespace libcamera;
+ GST_DEBUG_CATEGORY_STATIC(source_debug);
+ #define GST_CAT_DEFAULT source_debug
+ 
+-#define TEMPLATE_CAPS GST_STATIC_CAPS("video/x-raw; image/jpeg; video/x-bayer")
++#define TEMPLATE_CAPS GST_STATIC_CAPS("video/x-raw, format={RGBA,BGRA,NV12,DMA_DRM}; image/jpeg; video/x-bayer")
+ 
+ /* For the simple case, we have a src pad that is always present. */
+ GstStaticPadTemplate src_template = {
