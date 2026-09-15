@@ -1,0 +1,86 @@
+From: Claude Assistant <claude.com>
+Date: 15 Sept 2026
+Subject: [PATCH] libcamera's DMA-BUF advertisement fix.
+
+This patch addresses GPU>RAM video frames copy issue
+
+Signed-off-by: Aleksei <alksbrs@proton.me>
+
+
+diff --git a/src/gstreamer/gstlibcamera-utils.cpp b/src/gstreamer/gstlibcamera-utils.cpp
+index 6541d47..13e8fbb 100644
+--- a/src/gstreamer/gstlibcamera-utils.cpp
++++ b/src/gstreamer/gstlibcamera-utils.cpp
+@@ -13,6 +13,8 @@
+ #include <libcamera/control_ids.h>
+ #include <libcamera/formats.h>
+ 
++#include <gst/allocators/gstdmabuf.h>
++
+ using namespace libcamera;
+ 
+ static const struct {
+@@ -357,6 +359,25 @@ control_type_to_gtype(const ControlType &type)
+ 	return G_TYPE_INVALID;
+ }
+ 
++/*
++ * Append a memory:DMABuf-featured duplicate of a fixed caps structure.
++ *
++ * GstLibcameraAllocator (see gstlibcameraallocator.h) is a GstDmaBufAllocator
++ * subclass: every buffer it hands out is already a linear, DMA-BUF-backed
++ * GstMemory, regardless of the pixel format negotiated. What has been
++ * missing is advertising that capability in caps, so this duplicates
++ * whatever structure the plain path already built - same format, same
++ * width/height, no separate/fixed resolution - and tags the copy with the
++ * DMABuf caps feature so downstream can select it for zero-copy import.
++ */
++static void
++gst_caps_append_dmabuf_structure(GstCaps *caps, const GstStructure *s)
++{
++	GstStructure *dmabuf_s = gst_structure_copy(s);
++	GstCapsFeatures *features = gst_caps_features_new(GST_CAPS_FEATURE_MEMORY_DMABUF, nullptr);
++	gst_caps_append_structure_full(caps, dmabuf_s, features);
++}
++
+ GstCaps *
+ gst_libcamera_stream_formats_to_caps(const StreamFormats &formats)
+ {
+@@ -377,6 +398,8 @@ gst_libcamera_stream_formats_to_caps(const StreamFormats &formats)
+ 					  "width", G_TYPE_INT, size.width,
+ 					  "height", G_TYPE_INT, size.height,
+ 					  nullptr);
++			/* Advertise the same fixed size/format as DMA-BUF-importable. */
++			gst_caps_append_dmabuf_structure(caps, s);
+ 			gst_caps_append_structure(caps, s);
+ 		}
+ 
+@@ -400,6 +423,8 @@ gst_libcamera_stream_formats_to_caps(const StreamFormats &formats)
+ 			}
+ 			g_value_unset(&val);
+ 
++			/* Same range, advertised as DMA-BUF-importable too. */
++			gst_caps_append_dmabuf_structure(caps, s);
+ 			caps = gst_caps_merge_structure(caps, s);
+ 		}
+ 	}
+diff --git a/src/gstreamer/gstlibcamerasrc.cpp b/src/gstreamer/gstlibcamerasrc.cpp
+index 9061f91..005cff7 100644
+--- a/src/gstreamer/gstlibcamerasrc.cpp
++++ b/src/gstreamer/gstlibcamerasrc.cpp
+@@ -167,7 +167,14 @@ G_DEFINE_TYPE_WITH_CODE(GstLibcameraSrc, gst_libcamera_src, GST_TYPE_ELEMENT,
+ 			GST_DEBUG_CATEGORY_INIT(source_debug, "libcamerasrc", 0,
+ 						"libcamera Source"))
+ 
+-#define TEMPLATE_CAPS GST_STATIC_CAPS("video/x-raw; image/jpeg; video/x-bayer")
++/*
++ * The memory:DMABuf-featured alternative carries no format/size restriction
++ * of its own: gst_libcamera_stream_formats_to_caps() (gstlibcamera-utils.cpp)
++ * enumerates the actual per-pixelformat, per-size DMA-BUF-tagged structures
++ * at negotiation time, intersected against whatever downstream accepts here.
++ */
++#define TEMPLATE_CAPS GST_STATIC_CAPS("video/x-raw(memory:DMABuf); " \
++				      "video/x-raw; image/jpeg; video/x-bayer")
+ 
+ /* For the simple case, we have a src pad that is always present. */
+ GstStaticPadTemplate src_template = {
