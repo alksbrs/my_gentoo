@@ -1,0 +1,11 @@
+--- a/src/libcamera/shaders/bayer_unpacked.frag
++++ b/src/libcamera/shaders/bayer_unpacked.frag
+@@ -43,7 +43,7 @@
+     vec3 rgb;
+ 
+     #if defined(RAW10P)
+-    #define pixel(p) p.r / 4.0 + p.g * 64.0
++    #define pixel(p) p.r * 64.0
+     #define fetch(x, y) pixel(texture2D(tex_y, vec2(x, y)))
+     #elif defined(RAW12P)
+     #define pixel(p) p.r / 16.0 + p.g * 16.0

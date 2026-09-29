@@ -1,0 +1,53 @@
+From: Claude Assistant <claude.com>
+Date: 28 Aug 2026
+Subject: [PATCH] Configure `Agc:` override in ov2740.yaml
+
+The `agc.cpp.patch` and `agc.h.patch` add `int init()` and `int configure()`
+overrides to the `Agc` algorithm class, letting the tuning YAML clamp the
+analogue-gain range the proportional AGC controller is allowed to use, sourced
+from real driver-reported bounds and applied after those defaults are computed
+(per the `soft_simple.cpp` ordering guarantee).
+
+`agc.h.patch` — adds `#include <optional>`, forward-declares `ValueNode`, adds
+`init()`/`configure()` overrides, adds `maxGainOverride_`/`minGainOverride_`
+members (`std::optional<double>`).
+
+Signed-off-by: Aleksei <alksbrs@proton.me>
+
+
+--- a/src/ipa/simple/algorithms/agc.h
++++ b/src/ipa/simple/algorithms/agc.h
+@@ -7,10 +7,14 @@
+ 
+ #pragma once
+ 
++#include <optional>
++
+ #include "algorithm.h"
+ 
+ namespace libcamera {
+ 
++class ValueNode;
++
+ namespace ipa::soft::algorithms {
+ 
+ class Agc : public Algorithm
+@@ -19,6 +23,8 @@
+ 	Agc();
+ 	~Agc() = default;
+ 
++	int init(IPAContext &context, const ValueNode &tuningData) override;
++	int configure(IPAContext &context, const IPAConfigInfo &configInfo) override;
+ 	void process(IPAContext &context, const uint32_t frame,
+ 		     IPAFrameContext &frameContext,
+ 		     const SwIspStats *stats,
+@@ -26,6 +32,9 @@
+ 
+ private:
+ 	void updateExposure(IPAContext &context, IPAFrameContext &frameContext, double exposureMSV);
++
++	std::optional<double> maxGainOverride_;
++	std::optional<double> minGainOverride_;
+ };
+ 
+ } /* namespace ipa::soft::algorithms */

@@ -1,0 +1,81 @@
+#!/sbin/openrc-run
+
+description="Configure IPU6 camera media graph for OV2740"
+
+depend() {
+    need localmount
+    after modules
+}
+
+start() {
+    ebegin "Configuring IPU6 camera media graph"
+
+    # 1. Verify /dev/media0 exists
+    if [ ! -c /dev/media0 ]; then
+        eerror "/dev/media0 not found. IPU6 driver may not be loaded."
+        eend 1
+        return 1
+    fi
+
+    # 2. Reset the media graph to a clean state
+    einfo "Resetting media graph..."
+    media-ctl -d /dev/media0 -r || {
+        eerror "Failed to reset media graph"
+        eend 1
+        return 1
+    }
+
+    # 3. Link Sensor (ov2740 10-0036) to CSI2 1
+    # Note: Using the exact entity name from 'media-ctl -p'
+    einfo "Linking ov2740 to CSI2 1..."
+    media-ctl -d /dev/media0 -l '"ov2740 10-0036":0 -> "Intel IPU6 CSI2 1":0 [1]' || {
+        eerror "Failed to link ov2740 to CSI2 1"
+        eend 1
+        return 1
+    }
+
+    # 4. Set Format on CSI2 1 Sink (Must match sensor output: SGRBG10)
+    einfo "Setting CSI2 1 format to SGRBG10_1X10..."
+    media-ctl -d /dev/media0 -V '"Intel IPU6 CSI2 1":0 [fmt:SGRBG10_1X10/1932x1092]' || {
+        eerror "Failed to set CSI2 1 format"
+        eend 1
+        return 1
+    }
+
+    # 5. Enable the link from CSI2 1 (Pad 1) to Capture 8 (Pad 0)
+    # This is the critical step that was failing manually
+    einfo "Enabling link CSI2 1 -> Capture 8..."
+    media-ctl -d /dev/media0 -l '"Intel IPU6 CSI2 1":1 -> "Intel IPU6 ISYS Capture 8":0 [1]' || {
+        eerror "Failed to enable link to Capture 8"
+        eend 1
+        return 1
+    }
+
+    # 6. Set V4L2 Node Format (/dev/video8)
+    # Must match the media graph format. 'BA10' is the 4CC for 10-bit Bayer (GRGR/BGBG)
+    einfo "Setting V4L2 format on /dev/video8..."
+    v4l2-ctl --device=/dev/video8 --set-fmt-video=width=1932,height=1092,pixelformat=BA10 || {
+        eerror "Failed to set V4L2 format"
+        eend 1
+        return 1
+    }
+
+    # 7. Verify the final state
+    einfo "Verifying pipeline state..."
+    if media-ctl -d /dev/media0 -p | grep -q "Capture 8.*\[ENABLED\]"; then
+        einfo "Pipeline configured successfully."
+        eend 0
+    else
+        eerror "Pipeline verification failed: Link not enabled."
+        eend 1
+        return 1
+    fi
+}
+
+stop() {
+    ebegin "Stopping IPU6 camera configuration"
+    # No specific stop action needed as the driver handles cleanup on unload
+    # But we can reset the graph if desired
+    media-ctl -d /dev/media0 -r 2>/dev/null
+    eend 0
+}

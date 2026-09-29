@@ -1,0 +1,57 @@
+From: Claude Assistant <claude.com>
+Date: 28 Aug 2026
+Subject: [PATCH] Configure `Agc:` override in ov2740.yaml
+
+The `agc.cpp.patch` and `agc.h.patch` add `int init()` and `int configure()`
+overrides to the `Agc` algorithm class, letting the tuning YAML clamp the
+analogue-gain range the proportional AGC controller is allowed to use, sourced
+from real driver-reported bounds and applied after those defaults are computed
+(per the `soft_simple.cpp` ordering guarantee).
+
+`agc.cpp.patch` — adds `#include "libcamera/internal/yaml_parser.h"`, implements
+`Agc::init()` (reads `maxGain`/`minGain` from the algorithm's own YAML sub-block)
+and `Agc::configure()` (clamps `context.configuration.agc.againMax`/`againMin`
+if the tuning file requested a tighter bound than the driver default).
+
+Signed-off-by: Aleksei <alksbrs@proton.me>
+
+--- a/src/ipa/simple/algorithms/agc.cpp
++++ b/src/ipa/simple/algorithms/agc.cpp
+@@ -13,6 +13,8 @@
+ 
+ #include <libcamera/base/log.h>
+ 
++#include "libcamera/internal/yaml_parser.h"
++
+ #include "control_ids.h"
+ 
+ namespace libcamera {
+@@ -124,6 +126,28 @@
+ 		<< " exp " << exposure << " again " << again;
+ }
+ 
++int Agc::init([[maybe_unused]] IPAContext &context, const ValueNode &tuningData)
++{
++	maxGainOverride_ = tuningData["maxGain"].get<double>();
++	minGainOverride_ = tuningData["minGain"].get<double>();
++	return 0;
++}
++
++int Agc::configure(IPAContext &context, [[maybe_unused]] const IPAConfigInfo &configInfo)
++{
++	if (maxGainOverride_ && *maxGainOverride_ < context.configuration.agc.againMax) {
++		LOG(IPASoftExposure, Info)
++			<< "Clamping AGC max gain to " << *maxGainOverride_
++			<< " (driver-reported max was "
++			<< context.configuration.agc.againMax << ")";
++		context.configuration.agc.againMax = *maxGainOverride_;
++	}
++	if (minGainOverride_ && *minGainOverride_ > context.configuration.agc.againMin)
++		context.configuration.agc.againMin = *minGainOverride_;
++
++	return 0;
++}
++
+ void Agc::process(IPAContext &context,
+ 		  [[maybe_unused]] const uint32_t frame,
+ 		  IPAFrameContext &frameContext,

@@ -1,0 +1,33 @@
+#!/sbin/openrc-run
+
+description="Configure IPU6 DMA-BUF Zero-Copy Pipeline"
+
+depend() {
+    need localmount
+    after modules
+}
+
+start() {
+    ebegin "Configuring IPU6 DMA-BUF Pipeline"
+
+    # 1. Run the camera graph configuration
+    /etc/init.d/ipu6-camera start || {
+        eerror "Camera graph configuration failed"
+        eend 1
+        return 1
+    }
+
+    # 2. Verify DMA-BUF export capability (Optional sanity check)
+    # We can run a quick non-blocking test here if desired, 
+    # but the main config is the critical part.
+    
+    einfo "IPU6 DMA-BUF pipeline configured. Ready for libcamera/GStreamer."
+    eend 0
+}
+
+stop() {
+    ebegin "Stopping IPU6 DMA-BUF Pipeline"
+    # Stop any active streams if tracked
+    /etc/init.d/ipu6-camera stop 2>/dev/null
+    eend 0
+}
